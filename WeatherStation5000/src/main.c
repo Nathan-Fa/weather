@@ -23,10 +23,13 @@
 #include "light.h"
 #include "oled.h"
 #include "temp.h"
+#include "joystick.h"
 
 
 static uint32_t msTicks = 0;
 static uint8_t buf[10];
+static const uint8_t MAX_PAGE = 1;
+static const uint32_t TOP_LEFT = 28;
 
 static void intToString(int value, uint8_t* pBuf, uint32_t len, uint32_t base)
 {
@@ -95,8 +98,11 @@ int main (void)
 {
     int32_t t = 0;
     uint32_t lux = 0;
+    uint8_t joy = 0;
+    int8_t current_page = 0;
 
     GPIOInit();
+    GPIOSetDir(PORT0, 1, 0);
     init_timer32(0, 10);
 
     UARTInit(115200);
@@ -109,6 +115,7 @@ int main (void)
     oled_init();
     light_init();
     temp_init(&getTicks);
+    joystick_init();
 
 
     /* setup sys Tick. Elapsed time is e.g. needed by temperature sensor */
@@ -128,32 +135,57 @@ int main (void)
     }
 
     light_enable();
-    light_setRange(LIGHT_RANGE_4000);
+    light_setRange(LIGHT_RANGE_16000);
 
-    oled_clearScreen(OLED_COLOR_WHITE);
-    oled_putString(1,1,  (uint8_t*)"Temp   : ", OLED_COLOR_BLACK, OLED_COLOR_WHITE);
-    oled_putString(1,9,  (uint8_t*)"Light  : ", OLED_COLOR_BLACK, OLED_COLOR_WHITE);
+    oled_clearScreen(OLED_COLOR_BLACK);
 
-    while(1) {
+	oled_putString(1,TOP_LEFT,  (uint8_t*)"Temp   : ",OLED_COLOR_WHITE , OLED_COLOR_BLACK);
 
+    while(1)
+    {
+    	//joystick read
+    	uint8_t changed = 0;
+		if ((joy & JOYSTICK_LEFT) != 0)
+		{
+			current_page--;
+			if(current_page == -1)
+				current_page = MAX_PAGE;
+			changed = 1;
+		}
+		else if ((joy & JOYSTICK_RIGHT) != 0 || GPIOGetValue(PORT0,1) == 0) //0 means true
+		{
+			current_page++;
+			if(current_page == MAX_PAGE+1)
+				current_page = 0;
+			changed = 1;
+		}
 
-        /* Temperature */
-        t = temp_read();
+		switch(current_page)
+				{
+				case 0: /* Temperature */
+					t = temp_read();
+					intToString(t, buf, 10, 10);
 
-        /* light */
-        lux = light_read();
+					if(changed == 1) //refresh label
+						oled_putString(1,TOP_LEFT,  (uint8_t*)"Temp   : ",OLED_COLOR_WHITE ,OLED_COLOR_BLACK );
 
-        /* output values to OLED display */
-        intToString(t, buf, 10, 10);
-        oled_fillRect((1+9*7),1, 80, 8, OLED_COLOR_WHITE);
-        oled_putString((1+9*7),1, buf, OLED_COLOR_BLACK, OLED_COLOR_WHITE);
+					oled_fillRect((1+9*7),TOP_LEFT, 90, TOP_LEFT+8, OLED_COLOR_BLACK);
+					oled_putString((1+9*7),TOP_LEFT, buf, OLED_COLOR_WHITE ,OLED_COLOR_BLACK);
+					break;
+				case 1: /* Light */
+					lux = light_read();
+					intToString(lux, buf, 10, 10);
 
-        intToString(lux, buf, 10, 10);
-        oled_fillRect((1+9*6),9, 80, 16, OLED_COLOR_WHITE);
-        oled_putString((1+9*6),9, buf, OLED_COLOR_BLACK, OLED_COLOR_WHITE);
+					if(changed == 1) //refresh label
+						oled_putString(1,TOP_LEFT,  (uint8_t*)"Light  : ", OLED_COLOR_WHITE,OLED_COLOR_BLACK );
+
+					oled_fillRect((1+9*7),TOP_LEFT,90, TOP_LEFT+8, OLED_COLOR_BLACK);
+					oled_putString((1+9*7),TOP_LEFT, buf,OLED_COLOR_WHITE ,OLED_COLOR_BLACK );
+					break;
+				}
 
         /* delay */
-        delay32Ms(0, 200);
+        delay32Ms(0, 100);
     }
 
 }
