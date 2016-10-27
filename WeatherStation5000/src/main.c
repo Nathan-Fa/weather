@@ -141,51 +141,59 @@ int main (void)
 
 	oled_putString(1,TOP_LEFT,  (uint8_t*)"Temp   : ",OLED_COLOR_WHITE , OLED_COLOR_BLACK);
 
+	LPC_IOCON->PIO0_1 = LPC_IOCON->PIO0_1 & (~0x7); // magiczna instrukcja
+
     while(1)
     {
     	//joystick read
-    	uint8_t changed = 0;
+    	//uint8_t changed = 0;
 		if ((joy & JOYSTICK_LEFT) != 0)
 		{
 			current_page--;
 			if(current_page == -1)
 				current_page = MAX_PAGE;
-			changed = 1;
+			//changed = 1;
 		}
-		else if ((joy & JOYSTICK_RIGHT) != 0 || GPIOGetValue(PORT0,1) == 0) //0 means true
+		else if ((joy & JOYSTICK_RIGHT) != 0 || GPIOGetValue(PORT0, 1) == 0) //0 means true
 		{
 			current_page++;
 			if(current_page == MAX_PAGE+1)
 				current_page = 0;
-			changed = 1;
+			//changed = 1;
 		}
 
 		switch(current_page)
-				{
+			{
 				case 0: /* Temperature */
+				{
 					t = temp_read();
 					intToString(t, buf, 10, 10);
 
-					if(changed == 1) //refresh label
+					//if(changed == 1) //refresh label
 						oled_putString(1,TOP_LEFT,  (uint8_t*)"Temp   : ",OLED_COLOR_WHITE ,OLED_COLOR_BLACK );
 
 					oled_fillRect((1+9*7),TOP_LEFT, 90, TOP_LEFT+8, OLED_COLOR_BLACK);
 					oled_putString((1+9*7),TOP_LEFT, buf, OLED_COLOR_WHITE ,OLED_COLOR_BLACK);
 					break;
+				}
+
+
 				case 1: /* Light */
+				{
 					lux = light_read();
 					intToString(lux, buf, 10, 10);
 
-					if(changed == 1) //refresh label
+					//if(changed == 1) //refresh label
 						oled_putString(1,TOP_LEFT,  (uint8_t*)"Light  : ", OLED_COLOR_WHITE,OLED_COLOR_BLACK );
 
 					oled_fillRect((1+9*7),TOP_LEFT,90, TOP_LEFT+8, OLED_COLOR_BLACK);
 					oled_putString((1+9*7),TOP_LEFT, buf,OLED_COLOR_WHITE ,OLED_COLOR_BLACK );
 					break;
 				}
+			}
 
         /* delay */
-        delay32Ms(0, 100);
+        delay32Ms(0, 10);
     }
 
 }
