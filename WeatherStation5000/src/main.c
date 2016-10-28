@@ -100,6 +100,7 @@ int main (void)
     uint32_t lux = 0;
     uint8_t joy = 0;
     int8_t current_page = 0;
+    uint8_t buf2[1];
 
     GPIOInit();
     GPIOSetDir(PORT0, 1, 0);
@@ -141,25 +142,26 @@ int main (void)
 
 	oled_putString(1,TOP_LEFT,  (uint8_t*)"Temp   : ",OLED_COLOR_WHITE , OLED_COLOR_BLACK);
 
-	LPC_IOCON->PIO0_1 = LPC_IOCON->PIO0_1 & (~0x7); // magiczna instrukcja
+	LPC_IOCON->PIO0_1 = LPC_IOCON->PIO0_1 & (~0x7); // enable button
 
     while(1)
     {
     	//joystick read
-    	//uint8_t changed = 0;
+    	joy = joystick_read();
+    	uint8_t changed = 0;
 		if ((joy & JOYSTICK_LEFT) != 0)
 		{
 			current_page--;
 			if(current_page == -1)
 				current_page = MAX_PAGE;
-			//changed = 1;
+			changed = 1;
 		}
 		else if ((joy & JOYSTICK_RIGHT) != 0 || GPIOGetValue(PORT0, 1) == 0) //0 means true
 		{
 			current_page++;
 			if(current_page == MAX_PAGE+1)
 				current_page = 0;
-			//changed = 1;
+			changed = 1;
 		}
 
 		switch(current_page)
@@ -168,12 +170,15 @@ int main (void)
 				{
 					t = temp_read();
 					intToString(t, buf, 10, 10);
-
-					//if(changed == 1) //refresh label
+					buf2[0] = buf[2];
+					buf[2] = '\0';
+					if(changed == 1) //refresh label
 						oled_putString(1,TOP_LEFT,  (uint8_t*)"Temp   : ",OLED_COLOR_WHITE ,OLED_COLOR_BLACK );
 
 					oled_fillRect((1+9*7),TOP_LEFT, 90, TOP_LEFT+8, OLED_COLOR_BLACK);
 					oled_putString((1+9*7),TOP_LEFT, buf, OLED_COLOR_WHITE ,OLED_COLOR_BLACK);
+					oled_putPixel((1+9*7) + 14,TOP_LEFT + 6,OLED_COLOR_WHITE);
+					oled_putString((1+9*7) + 16,TOP_LEFT, buf2, OLED_COLOR_WHITE ,OLED_COLOR_BLACK);
 					break;
 				}
 
@@ -183,7 +188,7 @@ int main (void)
 					lux = light_read();
 					intToString(lux, buf, 10, 10);
 
-					//if(changed == 1) //refresh label
+					if(changed == 1) //refresh label
 						oled_putString(1,TOP_LEFT,  (uint8_t*)"Light  : ", OLED_COLOR_WHITE,OLED_COLOR_BLACK );
 
 					oled_fillRect((1+9*7),TOP_LEFT,90, TOP_LEFT+8, OLED_COLOR_BLACK);
