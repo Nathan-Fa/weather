@@ -1,10 +1,6 @@
 /*****************************************************************************
- *   Peripherals such as temp sensor, light sensor, accelerometer,
- *   and trim potentiometer are monitored and values are written to
- *   the OLED display.
  *
- *   Copyright(C) 2009, Embedded Artists AB
- *   All rights reserved.
+ *   WeatherStation5000
  *
  ******************************************************************************/
 
@@ -18,18 +14,23 @@
 #include "gpio.h"
 #include "ssp.h"
 #include "adc.h"
-
+#include "rgb.h"
+#include "rotary.h"
 
 #include "light.h"
 #include "oled.h"
 #include "temp.h"
 #include "joystick.h"
 
-
 static uint32_t msTicks = 0;
 static uint8_t buf[10];
 static const uint8_t MAX_PAGE = 1;
 static const uint32_t TOP_LEFT = 28;
+
+#define __min(a,b)	( (a <  b) ? a : b )
+#define __max(a,b)	( (a >= b) ? a : b )
+
+uint8_t delayTimeMs = 50;
 
 static void intToString(int value, uint8_t* pBuf, uint32_t len, uint32_t base)
 {
@@ -94,13 +95,16 @@ static uint32_t getTicks(void)
 }
 
 
+
+//------------------------------------------------------------------------
 int main (void)
 {
-    int32_t t = 0;
+    int32_t temp = 0;
     uint32_t lux = 0;
     uint8_t joy = 0;
     int8_t current_page = 0;
     uint8_t buf2[1];
+    uint8_t rotaryReadVal = ROTARY_WAIT;
 
     GPIOInit();
     GPIOSetDir(PORT0, 1, 0);
@@ -117,6 +121,16 @@ int main (void)
     light_init();
     temp_init(&getTicks);
     joystick_init();
+    rgb_init();
+    rotary_init();
+
+    // TODO:
+    // 1) pressureInit ? RGB_GREEN : RGB_RED (czy udalo sie zaladowac RGB_GREEN)
+    // 2) Dzwieki a'la POST
+
+    rgb_setLeds(RGB_RED);
+
+    delay32Ms(0, 1500);
 
 
     /* setup sys Tick. Elapsed time is e.g. needed by temperature sensor */
@@ -138,11 +152,13 @@ int main (void)
     light_enable();
     light_setRange(LIGHT_RANGE_16000);
 
+    // Clear the screen to black color
     oled_clearScreen(OLED_COLOR_BLACK);
-
 	oled_putString(1,TOP_LEFT,  (uint8_t*)"Temp   : ",OLED_COLOR_WHITE , OLED_COLOR_BLACK);
 
 	LPC_IOCON->PIO0_1 = LPC_IOCON->PIO0_1 & (~0x7); // enable button
+
+
 
     while(1)
     {
@@ -164,12 +180,36 @@ int main (void)
 			changed = 1;
 		}
 
+
+		// Sprawdz stan rotacyjnego przelacznika kwadraturowego
+		rotaryReadVal = rotary_read();
+		switch (rotaryReadVal)
+		{
+		case ROTARY_RIGHT:
+		{
+			delayTimeMs -= 50;
+			delayTimeMs = __max(1, delayTimeMs);
+			break;
+		}
+
+		case ROTARY_LEFT:
+		{
+			delayTimeMs += 50;
+			delayTimeMs = __min(200, delayTimeMs);
+			break;
+		}
+
+
+		}
+
+
 		switch(current_page)
 			{
-				case 0: /* Temperature */
+				case 0:
 				{
-					t = temp_read();
-					intToString(t, buf, 10, 10);
+					rgb_setLeds(RGB_GREEN | RGB_BLUE);
+					temp = temp_read();
+					intToString(temp, buf, 10, 10);
 					buf2[0] = buf[2];
 					buf[2] = '\0';
 					if(changed == 1) //refresh label
@@ -183,8 +223,9 @@ int main (void)
 				}
 
 
-				case 1: /* Light */
+				case 1:
 				{
+					rgb_setLeds(RGB_RED | RGB_GREEN);
 					lux = light_read();
 					intToString(lux, buf, 10, 10);
 
@@ -197,8 +238,9 @@ int main (void)
 				}
 			}
 
+
         /* delay */
-        delay32Ms(0, 10);
+        delay32Ms(0, delayTimeMs);
     }
 
 }
