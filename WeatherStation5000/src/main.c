@@ -21,10 +21,10 @@
 #include "oled.h"
 #include "temp.h"
 #include "joystick.h"
+#include "../include/pressure.h"
 
 static uint32_t msTicks = 0;
 static uint8_t buf[10];
-static const uint8_t MAX_PAGE = 1;
 static const uint32_t TOP_LEFT = 28;
 
 #define __min(a,b)	( (a <  b) ? a : b )
@@ -102,10 +102,12 @@ int main (void)
     int32_t temp = 0;
     uint32_t lux = 0;
     uint8_t joy = 0;
+    uint8_t is_pressure_connected = 0;
     int8_t current_page = 0;
     uint8_t buf2[1];
     uint8_t rotaryReadVal = ROTARY_WAIT;
-
+    uint8_t max_page;
+    uint8_t pressure[8];
     GPIOInit();
     GPIOSetDir(PORT0, 1, 0);
     init_timer32(0, 10);
@@ -123,14 +125,29 @@ int main (void)
     joystick_init();
     rgb_init();
     rotary_init();
+    light_enable();
+    light_setRange(LIGHT_RANGE_16000);
+
+    oled_clearScreen(OLED_COLOR_BLACK);
+	oled_putString(1,TOP_LEFT,  (uint8_t*)"Loading...",OLED_COLOR_WHITE , OLED_COLOR_BLACK);
+
+    if(init_pressure() == 1)
+    {
+        oled_clearScreen(OLED_COLOR_BLACK);
+    	oled_putString(1,TOP_LEFT,  (uint8_t*)"Calculating pressure...",OLED_COLOR_WHITE , OLED_COLOR_BLACK);
+        intToString(get_pressure(), pressure, 8, 10);
+        max_page = 2;
+        rgb_setLeds(RGB_GREEN);
+    }
+    else
+    {
+    	max_page = 1;
+    	rgb_setLeds(RGB_RED);
+    }
+
 
     // TODO:
-    // 1) pressureInit ? RGB_GREEN : RGB_RED (czy udalo sie zaladowac RGB_GREEN)
     // 2) Dzwieki a'la POST
-
-    rgb_setLeds(RGB_RED);
-
-    delay32Ms(0, 1500);
 
 
     /* setup sys Tick. Elapsed time is e.g. needed by temperature sensor */
@@ -149,12 +166,8 @@ int main (void)
       LPC_SYSCON->SYSTICKCLKDIV = 0x08;
     }
 
-    light_enable();
-    light_setRange(LIGHT_RANGE_16000);
-
     // Clear the screen to black color
-    oled_clearScreen(OLED_COLOR_BLACK);
-	oled_putString(1,TOP_LEFT,  (uint8_t*)"Temp   : ",OLED_COLOR_WHITE , OLED_COLOR_BLACK);
+
 
 	LPC_IOCON->PIO0_1 = LPC_IOCON->PIO0_1 & (~0x7); // enable button
 
@@ -169,13 +182,13 @@ int main (void)
 		{
 			current_page--;
 			if(current_page == -1)
-				current_page = MAX_PAGE;
+				current_page = max_page;
 			changed = 1;
 		}
 		else if ((joy & JOYSTICK_RIGHT) != 0 || GPIOGetValue(PORT0, 1) == 0) //0 means true
 		{
 			current_page++;
-			if(current_page == MAX_PAGE+1)
+			if(current_page == max_page+1)
 				current_page = 0;
 			changed = 1;
 		}
@@ -188,18 +201,23 @@ int main (void)
 		case ROTARY_RIGHT:
 		{
 			delayTimeMs -= 50;
-			delayTimeMs = __max(1, delayTimeMs);
+			if(delayTimeMs < 1)
+				delayTimeMs = 1;
+			//delayTimeMs = __max(1, delayTimeMs);
 			break;
 		}
 
 		case ROTARY_LEFT:
 		{
 			delayTimeMs += 50;
-			delayTimeMs = __min(200, delayTimeMs);
+			if(delayTimeMs > 500)
+				delayTimeMs = 500;
+			//delayTimeMs = __min(200, delayTimeMs);
 			break;
 		}
 
-
+		default:
+			break;
 		}
 
 
@@ -207,13 +225,16 @@ int main (void)
 			{
 				case 0:
 				{
-					rgb_setLeds(RGB_GREEN | RGB_BLUE);
 					temp = temp_read();
 					intToString(temp, buf, 10, 10);
 					buf2[0] = buf[2];
+					buf2[1] = '\0';
 					buf[2] = '\0';
 					if(changed == 1) //refresh label
+					{
+					    oled_clearScreen(OLED_COLOR_BLACK);
 						oled_putString(1,TOP_LEFT,  (uint8_t*)"Temp   : ",OLED_COLOR_WHITE ,OLED_COLOR_BLACK );
+					}
 
 					oled_fillRect((1+9*7),TOP_LEFT, 90, TOP_LEFT+8, OLED_COLOR_BLACK);
 					oled_putString((1+9*7),TOP_LEFT, buf, OLED_COLOR_WHITE ,OLED_COLOR_BLACK);
@@ -225,15 +246,28 @@ int main (void)
 
 				case 1:
 				{
-					rgb_setLeds(RGB_RED | RGB_GREEN);
 					lux = light_read();
 					intToString(lux, buf, 10, 10);
 
 					if(changed == 1) //refresh label
+					{
+						oled_clearScreen(OLED_COLOR_BLACK);
 						oled_putString(1,TOP_LEFT,  (uint8_t*)"Light  : ", OLED_COLOR_WHITE,OLED_COLOR_BLACK );
+					}
 
 					oled_fillRect((1+9*7),TOP_LEFT,90, TOP_LEFT+8, OLED_COLOR_BLACK);
 					oled_putString((1+9*7),TOP_LEFT, buf,OLED_COLOR_WHITE ,OLED_COLOR_BLACK );
+					break;
+				}
+				case 2:
+				{
+					if(changed == 1)
+					{
+						oled_clearScreen(OLED_COLOR_BLACK);
+						oled_putString(1,TOP_LEFT,  (uint8_t*)"Press:", OLED_COLOR_WHITE,OLED_COLOR_BLACK );
+						oled_fillRect((1+9*5),TOP_LEFT,90, TOP_LEFT+8, OLED_COLOR_BLACK);
+						oled_putString((1+9*5),TOP_LEFT, pressure,OLED_COLOR_WHITE ,OLED_COLOR_BLACK );
+					}
 					break;
 				}
 			}
@@ -244,3 +278,4 @@ int main (void)
     }
 
 }
+
