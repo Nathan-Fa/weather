@@ -4,7 +4,6 @@
  *
  ******************************************************************************/
 
-
 #include "mcu_regs.h"
 #include "type.h"
 #include "uart.h"
@@ -22,6 +21,7 @@
 #include "temp.h"
 #include "joystick.h"
 #include "../include/pressure.h"
+#include "../include/pressure180.h"
 
 static uint32_t msTicks = 0;
 static uint8_t buf[10];
@@ -119,6 +119,12 @@ int main (void)
     SSPInit();
     ADCInit( ADC_CLK );
 
+    // BMP180 API test
+   s32 bmp180result = BMP180Init();
+   intToString( bmp180result, pressure, 8, 10);
+   max_page = 2;
+
+
     oled_init();
     light_init();
     temp_init(&getTicks);
@@ -131,11 +137,14 @@ int main (void)
     oled_clearScreen(OLED_COLOR_BLACK);
 	oled_putString(1,TOP_LEFT,  (uint8_t*)"Loading...",OLED_COLOR_WHITE , OLED_COLOR_BLACK);
 
-    if(init_pressure() == 1)
+
+
+/*
+    if(isPressure == 1)
     {
         oled_clearScreen(OLED_COLOR_BLACK);
-    	oled_putString(1,TOP_LEFT,  (uint8_t*)"Calculating pressure...",OLED_COLOR_WHITE , OLED_COLOR_BLACK);
-        intToString(get_pressure(), pressure, 8, 10);
+    	oled_putString(1,TOP_LEFT,  (uint8_t*)"Calc. pressure...",OLED_COLOR_WHITE , OLED_COLOR_BLACK);
+        intToString( outPressure, pressure, 8, 10);
         max_page = 2;
         rgb_setLeds(RGB_GREEN);
     }
@@ -144,10 +153,7 @@ int main (void)
     	max_page = 1;
     	rgb_setLeds(RGB_RED);
     }
-
-
-    // TODO:
-    // 2) Dzwieki a'la POST
+*/
 
 
     /* setup sys Tick. Elapsed time is e.g. needed by temperature sensor */
