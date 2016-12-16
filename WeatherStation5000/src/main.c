@@ -20,8 +20,10 @@
 #include "oled.h"
 #include "temp.h"
 #include "joystick.h"
+#include "eeprom.h"
 #include "../include/pressure.h"
 #include "../include/pressure180.h"
+
 
 static uint32_t msTicks = 0;
 static uint8_t buf[10];
@@ -94,68 +96,8 @@ static uint32_t getTicks(void)
     return msTicks;
 }
 
-
-
-//------------------------------------------------------------------------
-int main (void)
+void lol()
 {
-    int32_t temp = 0;
-    uint32_t lux = 0;
-    uint8_t joy = 0;
-    uint8_t is_pressure_connected = 0;
-    int8_t current_page = 0;
-    uint8_t buf2[1];
-    uint8_t rotaryReadVal = ROTARY_WAIT;
-    uint8_t max_page;
-    uint8_t pressure[8];
-    GPIOInit();
-    GPIOSetDir(PORT0, 1, 0);
-    init_timer32(0, 10);
-
-    UARTInit(115200);
-    UARTSendString((uint8_t*)"WeatherStation5000\r\n");
-
-    I2CInit( (uint32_t)I2CMASTER, 0 );
-    SSPInit();
-    ADCInit( ADC_CLK );
-
-    // BMP180 API test
-   s32 bmp180result = BMP180Init();
-   intToString( bmp180result, pressure, 8, 10);
-   max_page = 2;
-
-
-    oled_init();
-    light_init();
-    temp_init(&getTicks);
-    joystick_init();
-    rgb_init();
-    rotary_init();
-    light_enable();
-    light_setRange(LIGHT_RANGE_16000);
-
-    oled_clearScreen(OLED_COLOR_BLACK);
-	oled_putString(1,TOP_LEFT,  (uint8_t*)"Loading...",OLED_COLOR_WHITE , OLED_COLOR_BLACK);
-
-
-
-/*
-    if(isPressure == 1)
-    {
-        oled_clearScreen(OLED_COLOR_BLACK);
-    	oled_putString(1,TOP_LEFT,  (uint8_t*)"Calc. pressure...",OLED_COLOR_WHITE , OLED_COLOR_BLACK);
-        intToString( outPressure, pressure, 8, 10);
-        max_page = 2;
-        rgb_setLeds(RGB_GREEN);
-    }
-    else
-    {
-    	max_page = 1;
-    	rgb_setLeds(RGB_RED);
-    }
-*/
-
-
     /* setup sys Tick. Elapsed time is e.g. needed by temperature sensor */
     SysTick_Config(SystemCoreClock / 1000);
     if ( !(SysTick->CTRL & (1<<SysTick_CTRL_CLKSOURCE_Msk)) )
@@ -176,8 +118,128 @@ int main (void)
 
 
 	LPC_IOCON->PIO0_1 = LPC_IOCON->PIO0_1 & (~0x7); // enable button
+}
 
 
+//------------------------------------------------------------------------
+void RetrieveCachedData(uint8_t *pOutTemp, uint8_t *pOutLux, uint8_t *pOutPressure )
+{
+	char buf[32];
+    memset(buf, 0, 32);
+
+	int16_t len = eeprom_read(buf, 240, 32);
+
+	if ( buf[0] == '7' && buf[1] == '6' && buf[2] == '5' )
+	{
+		 int32_t temp = 0;
+		 uint32_t lux = 0;
+		 int32_t pressure = 0;
+
+		sscanf(buf, "765;%d;%d;%d;", &temp, &lux, &pressure);
+
+		intToString(temp, pOutTemp, 8, 10);
+		intToString(lux,  pOutLux,  8, 10);
+		intToString(pressure, pOutPressure, 8, 10);
+	}
+	else
+	{
+		strcpy(pOutTemp,	 "empty");
+		strcpy(pOutLux,  	 "empty");
+		strcpy(pOutPressure, "empty");
+	}
+}
+//------------------------------------------------------------------------
+void SaveCachedData(uint8_t *pressure)
+{
+	int32_t temp = temp_read();
+	uint32_t lux = light_read();
+
+	/*
+	uint8_t bufTemp[8];
+	uint8_t bufLight[8];
+	intToString(temp, bufTemp, 8, 10);
+	intToString(lux, bufLight, 8, 10);
+	*/
+
+	char buffer[32];
+	memset(buffer, 0, 32);
+
+	sprintf(buffer, "765;%d;%d;%s;", temp, lux, pressure);
+
+	int16_t len = eeprom_write(buffer, 240, 32);
+	return;
+}
+
+//------------------------------------------------------------------------
+int main (void)
+{
+	// Values from sensors
+    int32_t temp = 0;
+    uint32_t lux = 0;
+    uint8_t joy = 0;
+
+    uint8_t prevTemp[8];
+    uint8_t prevLux[8];
+    uint8_t prevPressure[8];
+    RetrieveCachedData(prevTemp, prevLux, prevPressure);
+
+    int8_t current_page = 0;
+    uint8_t buf2[1];
+    uint8_t rotaryReadVal = ROTARY_WAIT;
+    uint8_t max_page;
+    uint8_t pressure[8];
+    GPIOInit();
+    GPIOSetDir(PORT0, 1, 0);
+    init_timer32(0, 10);
+
+    UARTInit(115200);
+    UARTSendString((uint8_t*)"WeatherStation5000\r\n");
+
+
+    I2CInit( (uint32_t)I2CMASTER, 0 );
+    SSPInit();
+    ADCInit( ADC_CLK );
+
+
+    oled_init();
+    light_init();
+    temp_init(&getTicks);
+    joystick_init();
+    rgb_init();
+    rotary_init();
+    light_enable();
+    light_setRange(LIGHT_RANGE_16000);
+
+    oled_clearScreen(OLED_COLOR_BLACK);
+	oled_putString(1,TOP_LEFT,  (uint8_t*)"Loading...",OLED_COLOR_WHITE , OLED_COLOR_BLACK);
+
+
+	//uint8_t isPressure = init_pressure();
+	uint8_t isPressure = 1;
+	intToString(105000, pressure, 8, 10);
+
+    if(isPressure == 1)
+    {
+        oled_clearScreen(OLED_COLOR_BLACK);
+    	oled_putString(1,TOP_LEFT,  (uint8_t*)"Calc. pressure...",OLED_COLOR_WHITE , OLED_COLOR_BLACK);
+       // intToString((int)get_pressure(), pressure, 8, 10);
+        max_page = 2;
+        rgb_setLeds(RGB_GREEN);
+    }
+    else
+    {
+    	max_page = 1;
+    	rgb_setLeds(RGB_RED | RGB_GREEN);
+    }
+
+
+
+    lol();
+
+
+    SaveCachedData(pressure);
+
+    oled_clearScreen(OLED_COLOR_BLACK);
 
     while(1)
     {
@@ -246,6 +308,9 @@ int main (void)
 					oled_putString((1+9*7),TOP_LEFT, buf, OLED_COLOR_WHITE ,OLED_COLOR_BLACK);
 					oled_putPixel((1+9*7) + 14,TOP_LEFT + 6,OLED_COLOR_WHITE);
 					oled_putString((1+9*7) + 16,TOP_LEFT, buf2, OLED_COLOR_WHITE ,OLED_COLOR_BLACK);
+
+					oled_fillRect((1+9*6),TOP_LEFT+8,90, TOP_LEFT+16, OLED_COLOR_BLACK);
+					oled_putString((1+9*6),TOP_LEFT+8, prevTemp,OLED_COLOR_WHITE ,OLED_COLOR_BLACK );
 					break;
 				}
 
@@ -263,6 +328,9 @@ int main (void)
 
 					oled_fillRect((1+9*7),TOP_LEFT,90, TOP_LEFT+8, OLED_COLOR_BLACK);
 					oled_putString((1+9*7),TOP_LEFT, buf,OLED_COLOR_WHITE ,OLED_COLOR_BLACK );
+
+					oled_fillRect((1+9*6),TOP_LEFT+8,90, TOP_LEFT+16, OLED_COLOR_BLACK);
+					oled_putString((1+9*6),TOP_LEFT+8, prevLux,OLED_COLOR_WHITE ,OLED_COLOR_BLACK );
 					break;
 				}
 				case 2:
@@ -273,6 +341,9 @@ int main (void)
 						oled_putString(1,TOP_LEFT,  (uint8_t*)"Press:", OLED_COLOR_WHITE,OLED_COLOR_BLACK );
 						oled_fillRect((1+9*5),TOP_LEFT,90, TOP_LEFT+8, OLED_COLOR_BLACK);
 						oled_putString((1+9*5),TOP_LEFT, pressure,OLED_COLOR_WHITE ,OLED_COLOR_BLACK );
+
+						oled_fillRect((1+9*5),TOP_LEFT+8,90, TOP_LEFT+16, OLED_COLOR_BLACK);
+						oled_putString((1+9*5),TOP_LEFT +8, prevPressure,OLED_COLOR_WHITE ,OLED_COLOR_BLACK );
 					}
 					break;
 				}

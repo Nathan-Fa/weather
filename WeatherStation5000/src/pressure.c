@@ -19,17 +19,17 @@ short bmp085GetTemperature(unsigned int ut);
 long bmp085GetPressure(unsigned long up);
 
 // Calibration values
-int ac1;
-int ac2;
-int ac3;
-unsigned int ac4;
-unsigned int ac5;
-unsigned int ac6;
-int b1;
-int b2;
-int mb;
-int mc;
-int md;
+short ac1;
+short ac2;
+short ac3;
+unsigned short ac4;
+unsigned short ac5;
+unsigned short ac6;
+short b1;
+short b2;
+short mb;
+short mc;
+short md;
 
 // b5 is calculated in bmp085GetTemperature(...), this variable is also used in bmp085GetPressure(...)
 // so ...Temperature(...) must be called before ...Pressure(...).
@@ -56,7 +56,7 @@ uint8_t init_pressure()
 	  mc = bmp085ReadInt(0xBC);
 	  md = bmp085ReadInt(0xBE);
 
-	  return (ac1 == ac2 == ac3) ? 1 : 0;
+	  return (ac1 == ac2 && ac2 == ac3) ? 0 : 1;
 }
 
 long get_pressure()
@@ -71,8 +71,8 @@ char bmp085Read(unsigned char address)
   unsigned char buf[1];
   unsigned char addr[1];
   addr[0] = address;
-  I2CWrite(BMP180_ADDRESS,addr,1);
-  I2CRead(BMP180_ADDRESS,buf,1);
+  I2CWrite(0xEE,addr,1);
+  I2CRead(0xEF,buf,1);
   //Wire.beginTransmission(BMP180_ADDRESS);
   //Wire.write(address);
   //Wire.endTransmission();
@@ -117,7 +117,7 @@ unsigned int bmp085ReadUT()
   unsigned char addr[2];
   addr[0] = 0xF4;
   addr[1] = 0x2E;
-  I2CWrite(BMP180_ADDRESS,addr,2);
+  I2CWrite(0xEE,addr,2);
 
   // Wait at least 4.5ms
   delay32Ms(0, 5);
@@ -145,8 +145,8 @@ unsigned long bmp085ReadUP()
   // Read register 0xF6 (MSB), 0xF7 (LSB), and 0xF8 (XLSB)
   unsigned char buf[3];
   addr[0] = 0xF6;
-  I2CWrite(BMP180_ADDRESS,addr,1);
-  I2CRead(BMP180_ADDRESS,buf,3);
+  I2CWrite(0xEE,addr,1);
+  I2CRead(0xEF,buf,3);
 
   msb = buf[0];
   lsb = buf[1];
