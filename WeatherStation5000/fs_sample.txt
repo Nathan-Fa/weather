@@ -1,0 +1,28 @@
+    // new file    don't forget res = f_mount(0, &Fatfs[0]);
+    FIL file;
+
+    //FRESULT fr_result = f_open(&file, "file.txt", FA_WRITE | FA_CREATE_ALWAYS);
+    FRESULT fr_result = f_open(&file, "file.txt", FA_READ);
+
+    uint8_t buf[8];
+    uint8_t buflol[8];
+
+    for (i=0; i < 8; ++i)
+    {
+    	buf[i] = (i+48);
+    }
+
+    UINT br = 8;
+    UINT bw = 0;
+
+    //fr_result = f_write(&file, buf, 8, &bw);
+
+    fr_result = f_read(&file,buflol ,sizeof(buflol) ,&br);
+
+    buflol[0]= 'g';
+    fr_result ++;
+    int fdsf= fr_result;
+    f_close(&file);
+
+
+   // f_mount(NULL, "0:");
