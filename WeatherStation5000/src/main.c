@@ -22,7 +22,7 @@
 #include "joystick.h"
 #include "eeprom.h"
 #include "../include/pressure.h"
-#include "../include/pressure180.h"
+
 
 
 static uint32_t msTicks = 0;
@@ -96,7 +96,7 @@ static uint32_t getTicks(void)
     return msTicks;
 }
 
-void lol()
+void InitSysTick()
 {
     /* setup sys Tick. Elapsed time is e.g. needed by temperature sensor */
     SysTick_Config(SystemCoreClock / 1000);
@@ -164,7 +164,7 @@ void SaveCachedData(uint8_t *pressure)
 	char buffer[32];
 	memset(buffer, 0, 32);
 
-	sprintf(buffer, "765;%d;%d;%s;", temp, lux, pressure);
+	sprintf(buffer, "765;%d;%d;%s;", temp, lux, pressure); //765 as control number
 
 	int16_t len = eeprom_write(buffer, 240, 32);
 	return;
@@ -181,7 +181,7 @@ int main (void)
     uint8_t prevTemp[8];
     uint8_t prevLux[8];
     uint8_t prevPressure[8];
-    RetrieveCachedData(prevTemp, prevLux, prevPressure);
+
 
     int8_t current_page = 0;
     uint8_t buf2[1];
@@ -199,8 +199,6 @@ int main (void)
     I2CInit( (uint32_t)I2CMASTER, 0 );
     SSPInit();
     ADCInit( ADC_CLK );
-
-
     oled_init();
     light_init();
     temp_init(&getTicks);
@@ -208,21 +206,22 @@ int main (void)
     rgb_init();
     rotary_init();
     light_enable();
+    InitSysTick();
+
+
+    RetrieveCachedData(prevTemp, prevLux, prevPressure);
     light_setRange(LIGHT_RANGE_16000);
 
     oled_clearScreen(OLED_COLOR_BLACK);
 	oled_putString(1,TOP_LEFT,  (uint8_t*)"Loading...",OLED_COLOR_WHITE , OLED_COLOR_BLACK);
 
 
-	//uint8_t isPressure = init_pressure();
-	uint8_t isPressure = 1;
-	intToString(105000, pressure, 8, 10);
-
+	uint8_t isPressure = init_pressure();
     if(isPressure == 1)
     {
         oled_clearScreen(OLED_COLOR_BLACK);
     	oled_putString(1,TOP_LEFT,  (uint8_t*)"Calc. pressure...",OLED_COLOR_WHITE , OLED_COLOR_BLACK);
-       // intToString((int)get_pressure(), pressure, 8, 10);
+        intToString((int)get_pressure(), pressure, 8, 10);
         max_page = 2;
         rgb_setLeds(RGB_GREEN);
     }
@@ -231,11 +230,6 @@ int main (void)
     	max_page = 1;
     	rgb_setLeds(RGB_RED | RGB_GREEN);
     }
-
-
-
-    lol();
-
 
     SaveCachedData(pressure);
 
@@ -355,4 +349,6 @@ int main (void)
     }
 
 }
+
+
 
